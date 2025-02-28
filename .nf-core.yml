@@ -1,0 +1,68 @@
+lint:
+  files_exist:
+    - .github/ISSUE_TEMPLATE/bug_report.yml
+    - .github/ISSUE_TEMPLATE/feature_request.yml
+    - .github/PULL_REQUEST_TEMPLATE.md
+    - .github/CONTRIBUTING.md
+    - .github/.dockstore.yml
+    - .github/ISSUE_TEMPLATE/bug_report.yml
+    - .github/ISSUE_TEMPLATE/feature_request.yml
+    - .github/PULL_REQUEST_TEMPLATE.md
+    - .github/CONTRIBUTING.md
+    - .github/.dockstore.yml
+    - CODE_OF_CONDUCT.md
+    - assets/nf-core-config_loading_logo_light.png
+    - docs/images/nf-core-config_loading_logo_light.png
+    - docs/images/nf-core-config_loading_logo_dark.png
+    - .github/ISSUE_TEMPLATE/config.yml
+    - .github/workflows/awstest.yml
+    - .github/workflows/awsfulltest.yml
+  files_unchanged:
+    - .github/ISSUE_TEMPLATE/bug_report.yml
+    - .github/ISSUE_TEMPLATE/config.yml
+    - .github/ISSUE_TEMPLATE/feature_request.yml
+    - .github/PULL_REQUEST_TEMPLATE.md
+    - .github/workflows/branch.yml
+    - .github/workflows/linting_comment.yml
+    - .github/workflows/linting.yml
+    - .github/CONTRIBUTING.md
+    - .github/.dockstore.yml
+    - .github/ISSUE_TEMPLATE/bug_report.yml
+    - .github/ISSUE_TEMPLATE/config.yml
+    - .github/ISSUE_TEMPLATE/feature_request.yml
+    - .github/PULL_REQUEST_TEMPLATE.md
+    - .github/workflows/branch.yml
+    - .github/workflows/linting_comment.yml
+    - .github/workflows/linting.yml
+    - .github/CONTRIBUTING.md
+    - .github/.dockstore.yml
+    - CODE_OF_CONDUCT.md
+    - assets/nf-core-config_loading_logo_light.png
+    - docs/images/nf-core-config_loading_logo_light.png
+    - docs/images/nf-core-config_loading_logo_dark.png
+    - .github/ISSUE_TEMPLATE/bug_report.yml
+  multiqc_config:
+    - report_comment
+  nextflow_config:
+    - manifest.name
+    - manifest.homePage
+    - validation.help.beforeText
+    - validation.help.afterText
+    - validation.summary.beforeText
+    - validation.summary.afterText
+  readme:
+    - nextflow_badge
+    - nextflow_badge
+nf_core_version: 3.1.0
+repository_type: pipeline
+template:
+  author: FriederikeHanssen
+  description: reproduce config loading bugs
+  force: true
+  is_nfcore: false
+  name: config_loading
+  org: test
+  outdir: .
+  skip_features:
+    - github
+  version: 1.0.0dev
