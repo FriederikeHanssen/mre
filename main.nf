@@ -1,6 +1,6 @@
 process DEBUG_MSISENSOR2 {
       publishDir "{params.outdir}/debug_output", mode: 'copy'
-      container 'quay.io/biocontainers/msisensor2:0.1--hd03093a_0'  // or your custom one
+      container 'ghcr.io/friederikehanssen/msisensor2:test-fix'  // or your custom one
 
       output:
       path "cpu_flags.txt"
