@@ -1,7 +1,6 @@
 process DEBUG_MSISENSOR2 {
       publishDir "{params.outdir}/debug_output", mode: 'copy'
-      container 'ghcr.io/friederikehanssen/msisensor2:test-fix'  // or your custom one
-
+      container 'ghcr.io/friederikehanssen/msisensor2:upstream-test'
       output:
       path "cpu_flags.txt"
       path "msisensor2_test.txt"
