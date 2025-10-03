@@ -1,0 +1,30 @@
+process DEBUG_MSISENSOR2 {
+      publishDir "{params.outdir}/debug_output", mode: 'copy'
+      container 'quay.io/biocontainers/msisensor2:0.1--hd03093a_0'  // or your custom one
+
+      output:
+      path "cpu_flags.txt"
+      path "msisensor2_test.txt"
+
+      script:
+      """
+      # Check CPU features
+      cat /proc/cpuinfo | grep flags | head -1 > cpu_flags.txt
+      
+      # Check container OS
+      cat /etc/os-release >> cpu_flags.txt
+      
+      # Check glibc version
+      ldd --version >> cpu_flags.txt
+      
+      # Test msisensor2
+      msisensor2 2>&1 > msisensor2_test.txt || echo "Exit code: \$?" >> msisensor2_test.txt
+      
+      # Check library dependencies
+      ldd \$(which msisensor2) >> msisensor2_test.txt
+      """
+  }
+
+  workflow {
+    DEBUG_MSISENSOR2()
+  }
