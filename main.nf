@@ -22,6 +22,12 @@ process DEBUG_MSISENSOR2 {
       
       # Check library dependencies
       ldd \$(which msisensor2) >> msisensor2_test.txt
+
+        # Test with help flag
+        msisensor2 -h 2>&1 > msisensor2_test.txt || echo "Exit code: \$?" >> msisensor2_test.txt
+
+        # Or just run the version check like the conda test does
+        msisensor2 2>&1 | grep -i version || echo "No version found"
       """
   }
 
