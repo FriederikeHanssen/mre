@@ -1,0 +1,70 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/example/optional-params/main/nextflow_schema.json",
+    "title": "optional-params pipeline parameters",
+    "description": "Showcase of optional/nullable typed parameters with nf-schema",
+    "type": "object",
+    "$defs": {
+        "required_inputs": {
+            "title": "Required inputs",
+            "type": "object",
+            "description": "Parameters that must always be supplied.",
+            "required": ["input", "foo"],
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "format": "file-path",
+                    "pattern": "^\\S+\\.csv$",
+                    "description": "Path to the input samplesheet (CSV)."
+                },
+                "foo": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Path to the primary reference input."
+                }
+            }
+        },
+        "optional_inputs": {
+            "title": "Optional inputs",
+            "type": "object",
+            "description": "Everything below is optional. Note: no defaults on nullable params, and no `required` entries.",
+            "properties": {
+                "max_items": {
+                    "type": "integer",
+                    "default": 100,
+                    "minimum": 0,
+                    "description": "Maximum number of items to process."
+                },
+                "mode": {
+                    "type": "string",
+                    "default": "quick",
+                    "enum": ["quick", "full"],
+                    "description": "Run mode."
+                },
+                "foo_cache": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Pre-staged `foo`. When set, used instead of `foo`."
+                },
+                "bar": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Optional input. Supplying it enables the BAR branch."
+                },
+                "bar_config": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "BAR configuration. Required only when `bar` is provided."
+                },
+                "save_intermeds": {
+                    "type": "boolean",
+                    "description": "Publish intermediate files."
+                }
+            }
+        }
+    },
+    "allOf": [
+        { "$ref": "#/$defs/required_inputs" },
+        { "$ref": "#/$defs/optional_inputs" }
+    ]
+}
