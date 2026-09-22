@@ -49,6 +49,20 @@ process TO_UPPER {
     """
 }
 
+process SEND_MAIL {
+
+    input:
+    tuple val(name), val(file)
+
+    exec:
+    sendMail(
+            to:      params.email,
+            subject: "PROCESS sends emails",
+            body:    "The TO_UPPER task for ${name} has completed. Output attached.",
+            attach:  file
+        )
+}
+
 workflow {
 
     greetings_ch = Channel.fromList(params.greetings)
@@ -56,22 +70,11 @@ workflow {
     // --- Process 1 -------------------------------------------------------
     SAY_HELLO(greetings_ch)
 
-    // One email per completed SAY_HELLO task, with the task's output file
-    // attached (see the `attach:` argument).
-    SAY_HELLO.out.subscribe { name, file ->
-        sendMail(
-            to:      params.email,
-            subject: "SAY_HELLO finished for ${name}",
-            body:    "The SAY_HELLO task for ${name} has completed. Output attached.",
-            attach:  file
-        )
-    }
+    SEND_MAIL(SAY_HELLO.out)
 
     // --- Process 2 -------------------------------------------------------
     TO_UPPER(SAY_HELLO.out)
 
-    // One email per completed TO_UPPER task. `attach:` also accepts a list to
-    // send several files, e.g. `attach: [file, 'results/report.html']`.
     TO_UPPER.out.subscribe { name, file ->
         sendMail(
             to:      params.email,
@@ -80,4 +83,5 @@ workflow {
             attach:  file
         )
     }
+
 }
