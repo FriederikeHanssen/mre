@@ -1,133 +1,163 @@
-# sendMail task-notification demo
+# Cached task email notifications with `sendMail()`
 
-A minimal two-process Nextflow pipeline that sends an email **every time an
-individual task finishes** — not just when the whole workflow completes — using
-Nextflow's built-in [`sendMail()`](https://docs.seqera.io/nextflow/notifications)
-function. No plugin required.
+This minimal Nextflow pipeline compares two ways of sending an email when a task finishes:
 
-This is the email counterpart of the `nf-slack-task-notification` branch.
+1. Calling `sendMail()` from an output-channel subscription.
+2. Calling `sendMail()` from a native, cacheable Nextflow process.
 
-## What it does
+The example shows why the second approach is preferable when resumed workflows should not resend notifications for cached results.
 
-The pipeline fans a list of names out into parallel tasks:
+## Pipeline structure
 
-```
-Channel.fromList([Ada, Alan, Grace, Linus])
-        │
-        ▼
-   SAY_HELLO   ──►  📧 one email per task
-        │
-        ▼
-   TO_UPPER    ──►  📧 one email per task
+```text
+names
+  │
+  ▼
+SAY_HELLO ──► SEND_MAIL ──► email with greeting.txt attached
+  │
+  ▼
+TO_UPPER ──► subscribe ──► email with shouting.txt attached
 ```
 
-- `SAY_HELLO` writes `Hello, <name>!` to a file.
-- `TO_UPPER` uppercases that greeting.
+With four names, each processing step creates four tasks.
 
-With four names, that's four independent tasks per process — and one email for
-each as it completes.
+## The behavior being tested
 
-## The key idea
+### Output subscription
 
-`sendMail()` is a **function** built into Nextflow (there is *no* `sendMail`
-directive). It can be called anywhere in the pipeline code:
+`TO_UPPER.out.subscribe` calls `sendMail()` whenever the channel emits an item:
 
-```groovy
-sendMail(
-    to:      params.email,
-    subject: "SAY_HELLO finished for ${name}",
-    body:    "The SAY_HELLO task for ${name} has completed."
-)
-```
-
-Nextflow's built-in mail hooks only fire at the **workflow** level (e.g.
-`workflow.onComplete` or the `-N` flag). To get a notification per **task**,
-subscribe to a process's output channel — each emitted item corresponds to one
-completed task:
-
-```groovy
-SAY_HELLO.out.subscribe { name, file ->
-    sendMail(to: params.email, subject: "SAY_HELLO finished for ${name}", body: "...")
-}
-```
-
-`.subscribe` runs the closure once for every item the channel emits, so you get
-exactly one email per finished task, tagged with which sample it was for.
-
-## Sending a file (attachment)
-
-`sendMail()` takes an `attach:` argument to attach one or more files. Here each
-per-task email carries that task's output file — the file is already in scope as
-the second element of the output tuple:
-
-```groovy
-SAY_HELLO.out.subscribe { name, file ->
+```nextflow
+TO_UPPER.out.subscribe { name, file ->
     sendMail(
-        to:      params.email,
-        subject: "SAY_HELLO finished for ${name}",
-        body:    "The SAY_HELLO task for ${name} has completed. Output attached.",
-        attach:  file
+        to: params.email,
+        subject: "TO_UPPER finished for ${name}",
+        body: "The TO_UPPER task for ${name} has completed.",
+        attach: file
     )
 }
 ```
 
-- **Multiple files:** pass a list — `attach: [file, 'results/report.html']`.
-- **Custom filename / inline images:** pass a map (or list of maps) —
-  `attach: [file, contentId: 'greeting', fileName: "${name}.txt"]`.
+Cached tasks emit their saved outputs again during `-resume`. The subscription therefore runs again and resends the emails.
 
-The attached path must exist when the email is sent. Because `.subscribe` fires
-as soon as the task completes, the staged output file is present, so attaching it
-directly works.
+Using `map` instead of `subscribe` does not change this behavior. Both operators run for values emitted from cached tasks.
 
-## Configuration
+### Native notification process
 
-`nextflow.config` sets the SMTP server for `sendMail()`, reading everything from
-the environment so no credentials are committed:
+`SEND_MAIL` is a native Nextflow process:
 
-```groovy
-mail {
-    from = System.getenv('SMTP_USER') ?: 'nextflow@localhost'
-    smtp {
-        host     = System.getenv('SMTP_HOST')
-        port     = (System.getenv('SMTP_PORT') ?: '587') as Integer
-        user     = System.getenv('SMTP_USER')
-        password = System.getenv('SMTP_PASSWORD')
-    }
+```nextflow
+process SEND_MAIL {
+    input:
+    tuple val(name), val(attachment)
+    val recipient
+
+    exec:
+    sendMail(
+        to: recipient,
+        subject: "SAY_HELLO finished for ${name}",
+        body: "The SAY_HELLO task for ${name} has completed. Output attached.",
+        attach: attachment
+    )
 }
 ```
 
-If you leave the SMTP settings unset, Nextflow falls back to the local
-`sendmail`/`mail` command on the host.
+It is called with:
 
-## Running it
+```nextflow
+SEND_MAIL(SAY_HELLO.out, params.email)
+```
 
-1. Point the config at an SMTP server and set the recipient:
+A native process runs its `exec:` block in the Nextflow JVM. It still participates in normal Nextflow task caching. When a successful `SEND_MAIL` task is restored during `-resume`, its `exec:` block is not run and the email is not sent again.
 
-   ```bash
-   export SMTP_HOST=smtp.gmail.com SMTP_PORT=587
-   export SMTP_USER=you@example.com SMTP_PASSWORD=your-app-password
-   nextflow run main.nf --email you@example.com
-   ```
+The recipient is an explicit process input so that changing it changes the task cache key.
 
-2. Check your inbox: one email as each `SAY_HELLO` task finishes, and one as
-   each `TO_UPPER` task finishes.
+## Why the attachment uses `val`
 
-### Testing locally without a real inbox
+A normal `script:` process stages a `path` input into its task directory before running its command. A native `exec:` process does not perform that normal staging step.
 
-Use a local SMTP catcher such as [MailHog](https://github.com/mailhog/MailHog)
-or [Mailpit](https://github.com/axllent/mailpit), which listen on
-`localhost:1025` and show captured mail in a web UI:
+If the native process declares:
+
+```nextflow
+tuple val(name), path(attachment)
+```
+
+the attachment is bound to a staged filename such as `greeting.txt`, but the file is not placed in the native task’s work directory. `sendMail()` therefore reports that the attachment does not exist.
+
+The MRE instead declares:
+
+```nextflow
+tuple val(name), val(attachment)
+```
+
+This preserves the `Path` object emitted by the upstream process. The pipeline does not contain a hard-coded absolute path; the path is passed through the dataflow connection. The Nextflow JVM reads the attachment directly from the upstream work directory.
+
+This approach requires the machine running Nextflow to be able to read the work storage. It works with the local executor and should be tested with the actual remote executor and work-storage configuration before production use.
+
+## Run locally with Mailpit
+
+Start Colima and Mailpit:
 
 ```bash
-export SMTP_HOST=localhost SMTP_PORT=1025 SMTP_USER= SMTP_PASSWORD=
+colima start
+
+docker --context colima run -d \
+    --name mailpit \
+    -p 1025:1025 \
+    -p 8025:8025 \
+    axllent/mailpit
+```
+
+If the container already exists:
+
+```bash
+docker --context colima start mailpit
+```
+
+Configure the SMTP connection:
+
+```bash
+export SMTP_HOST=127.0.0.1
+export SMTP_PORT=1025
+unset SMTP_USER SMTP_PASSWORD
+```
+
+Run the pipeline:
+
+```bash
 nextflow run main.nf --email demo@example.com
 ```
 
-## Notes
+View the captured messages at [http://localhost:8025](http://localhost:8025).
 
-- Sending one email per task can be a lot of mail — the `.subscribe` fires per
-  completed task by design. Adjust `params.greetings` to fan out into more or
-  fewer tasks.
-- Unlike the nf-slack plugin's custom messages, `sendMail()` throws on SMTP
-  errors, so a misconfigured server will surface loudly rather than fail
-  silently.
+## Test resume behavior
+
+Run the pipeline again:
+
+```bash
+nextflow run main.nf --email demo@example.com -resume
+```
+
+Expected behavior:
+
+- `SAY_HELLO`, `TO_UPPER`, and `SEND_MAIL` are reported as cached.
+- `SEND_MAIL` does not resend its messages because its `exec:` block is skipped.
+- The `TO_UPPER.out.subscribe` callback sends its messages again because cached outputs are emitted again.
+
+With four names, the first run should produce:
+
+- Four emails from `SEND_MAIL`.
+- Four emails from the `TO_UPPER` subscription.
+
+The resumed run should produce:
+
+- No new emails from `SEND_MAIL`.
+- Four additional emails from the subscription.
+
+## Limits
+
+This prevents duplicate delivery during a normal `-resume` when the notification task previously completed successfully.
+
+It is not a strict exactly-once guarantee. If the SMTP server accepts a message but the notification task fails before Nextflow records success, a retry could send the message again. Preventing that case requires a stable notification ID and a durable external idempotency record.
+
+The native process also runs on the Nextflow host rather than inside a task container. The Nextflow host must therefore have network access to the SMTP server and read access to the attachment.
